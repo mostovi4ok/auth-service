@@ -1,0 +1,92 @@
+services:
+  postgres_auth:
+    container_name: postgres-auth
+    tty: true
+    image: postgres:latest
+    env_file: ".postgres_auth.env"
+    volumes:
+      - postgres_auth:/var/lib/postgresql
+    expose:
+      - 5432
+    healthcheck:
+      test: ["CMD-SHELL", "psql -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 2G
+    networks:
+      fuzzy_excel_driver:
+        aliases:
+          - postgres_auth
+
+  redis_auth:
+    image: redis:latest
+    container_name: redis-auth
+    restart: unless-stopped
+    volumes:
+      - redis_auth:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      fuzzy_excel_driver:
+        aliases:
+          - redis_auth
+    expose:
+      - 6379
+
+  auth_service:
+    container_name: service-auth
+    build:
+      context: ./
+    image: auth:latest
+    pull_policy: never
+    restart: unless-stopped
+    volumes:
+      - .//:/app/
+    depends_on:
+      postgres_auth:
+        condition: service_healthy
+        restart: true
+      redis_auth:
+        condition: service_healthy
+        restart: true
+    networks:
+        fuzzy_excel_driver:
+            aliases:
+            - auth_service
+    expose:
+      - 8000
+
+  nginx:
+    container_name: nginx-auth
+    image: nginx:1.25.3
+    restart: unless-stopped
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/configs:/etc/nginx/conf.d:ro
+    depends_on:
+      auth_service:
+        condition: service_started
+        restart: true
+    ports:
+      - 1000:1000
+    networks:
+      fuzzy_excel_driver:
+
+networks:
+  fuzzy_excel_driver:
+    driver: bridge
+
+volumes:
+  postgres_auth:
+  redis_auth:

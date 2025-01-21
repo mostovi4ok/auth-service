@@ -1,0 +1,175 @@
+line-length = 120
+target-version = "py312"
+include = ["*.py", "ruff.toml"]
+exclude = ["**/typings/", "alembic/", "**/.venv/"]
+
+[lint]
+select = ["ALL"]
+ignore = [
+    "ANN101",  # Missing type annotation for `self` in method
+    "ANN102",  # Missing type annotation for `cls` in classmethod
+    "ANN401",  # Dynamically typed expressions (typing.Any) are disallowed
+    "ARG001",  # Unused function argument
+    "ARG002",  # Unused method argument
+    "ARG005",  # Unused lambda argument
+    "B904",    # Use `raise from` to specify exception cause
+    "B904",    # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None`
+    "COM812",  # Trailing comma missing
+    "CPY001",  # Missing copyright notice at top of file
+    "D100",    # Missing docstring in public module
+    "D101",    # Missing docstring in public class
+    "D102",    # Missing docstring in public method
+    "D103",    # Missing docstring in public function
+    "D104",    # Missing docstring in public package
+    "D105",    # Missing docstring in magic method
+    "D106",    # Missing docstring in public nested class
+    "D107",    # Missing docstring in `__init__`
+    "D203",    # Checks for docstrings on class definitions that are not preceded by a blank line.
+    "D205",    # 1 blank line required between summary line and description
+    "D212",    # Multi-line docstring summary should start at the first line
+    "D213",    # Multi-line docstring summary should start at the second line
+    "D400",    # First line should end with a period
+    "D401",    # First line of docstring should be in imperative mood
+    "D402",    # First line should not be the function's signature
+    "D415",    # First line should end with a period, question mark, or exclamation point
+    "DJ001",   # Avoid using `null=True` on string-based fields such as CharField
+    "DJ012",   # Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before `Meta` class
+    "DOC201",  # `return` is not documented in docstring
+    "DOC501",  # Raised exception `ImportError` missing from docstring
+    "DTZ004",  # The use of `datetime.datetime.utcfromtimestamp()` is not allowed,
+    "DTZ005",  # The use of `datetime.datetime.now()` without `tz` argument is not allowed
+    "DTZ006",  # The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed
+    "DTZ007",  # The use of `datetime.datetime.strptime()` without %z
+    "DTZ011",  # The use of `datetime.date.today()` is not allowed
+    "EM101",   # Exception must not use a string literal, assign to variable first
+    "EM102",   # Exception must not use an f-string literal, assign to variable first
+    "FBT001",  # Boolean-typed positional argument in function definition
+    "FBT002",  # Boolean default positional argument in function definition
+    "FBT003",  #  Boolean positional value in function call
+    "FIX001",  # Line contains FIXME, consider resolving the issue
+    "FIX002",  # Line contains TODO, consider resolving the issue
+    "FURB118", # Use `operator.itemgetter()` instead of defining a function
+    "G004",    # Logging statement uses f-string
+    "ISC001",  # The following rules may cause conflicts when used with the formatter
+    "PD901",  # Avoid using the generic variable name `df` for DataFrames
+    "PGH003",  # Use specific rule codes when ignoring type issues
+    "PGH004",  # Use specific rule codes when using `noqa`
+    "PLC0415", #`import` should be at the top-level of a file
+    "PLR1702", # Too many nested blocks
+    "PLR2004", # Magic value used in comparison, consider replacing 2 with a constant variable
+    "PLR6201", #  Use a `set` literal when testing for membership
+    "PLR6301", # Method could be a function or static method
+    "PT004",   # Fixture does not return anything, add leading underscore
+    "PYI041",  # Use `float` instead of `int | float`
+    "PYI051",  # `Literal` is redundant in a union with `str`
+    "RET502",  # Do not implicitly `return None` in function able to return non-`None` value
+    "RET503",  # Missing explicit `return` at the end of function able to return non-`None` valueRuff
+    "RET505",  #  Unnecessary `elif` after `return` statement
+    "RET506",  # Unnecessary `elif` after `raise` statement
+    "RUF001",  # Checks for ambiguous unicode characters in strings.
+    "RUF002",  # Checks for ambiguous unicode characters in docstring.
+    "RUF003",  # Checks for ambiguous unicode characters in comments.
+    "RUF012",  # Mutable class attributes should be annotated with `typing.ClassVar`
+    "S101",    # Use of `assert` detected
+    "S105",    # Possible hardcoded password assigned
+    "S311",    # Standard pseudo-random generators are not suitable for cryptographic purposes
+    "S610",    # Use of Django `extra` can lead to SQL injection vulnerabilities
+    "SIM101",  # Merge `isinstance` calls: `isinstance(value, None | str)
+    "SIM112",  # Use capitalized environment variable
+    "SLF001",  # Private member accessed
+    "T201",    #  `print` found
+    "T203",    # `pprint` found
+    "TC006",  #Add quotes to type expression in `typing.cast()
+    "TD001",   # Invalid TODO tag: `FIXME`
+    "TD002",   # Missing author in TODO
+    "TD003",   # Missing issue link on the line following this TODO
+    "TRY003",  # Avoid specifying long messages outside the exception 
+    "TRY301",  # Abstract `raise` to an inner function
+    "TRY400",  # Use `logging.exception` instead of `logging.error`
+]
+extend-safe-fixes = [
+    "TCH", # flake8-type-checking. TYPE_CHECKING support
+    "UP",  # pyupgrade
+]
+extend-unsafe-fixes = [
+    "ERA001", # Checks for commented-out Python code.
+    "F841",   # Checks for the presence of unused variables in function scopes.
+]
+unfixable = [
+    "RUF001", # Checks for ambiguous unicode characters in strings.
+    "RUF002", # Checks for ambiguous unicode characters in docstrings.
+    "RUF003", # Checks for ambiguous unicode characters in comments.
+]
+
+preview = true
+
+[format]
+docstring-code-format = true
+line-ending = "lf"           # Use `\n` line endings for all files
+preview = true
+
+[lint.pycodestyle]
+max-line-length = 120
+
+[lint.pyflakes]
+extend-generics = [
+    "django.db.models.ForeignKey",
+    "django.db.models.Manager",
+    "django.db.models.Model",
+]
+
+[lint.flake8-builtins]
+builtins-ignorelist = [
+    "exit",
+    "format",
+    "help",
+    "id",
+    "input",
+    "map",
+    "open",
+    "type",
+]
+
+[lint.flake8-annotations]
+allow-star-arg-any = true
+
+[lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
+
+
+[lint.flake8-self]
+extend-ignore-names = ["_meta"]
+
+[lint.flake8-type-checking]
+exempt-modules = ["typing", "typing_extensions"]
+runtime-evaluated-base-classes = [
+    "pydantic_settings.BaseSettings",
+    "pydantic.BaseModel",
+]
+runtime-evaluated-decorators = [
+    "pydantic.dataclasses.dataclass",
+    "r.core.py.types.runtime.runtime_typing",
+    "r.core.typed_ns.doors.ns_caller",
+    "r.core.typed_ns.includer.include",
+    "r.core.typed_ns.includer.include_frozen",
+    "r.core.typed_ns.namespacer.namespace",
+]
+strict = true
+
+[lint.isort]
+force-single-line = true
+lines-after-imports = 2
+
+[lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[lint.mccabe]
+max-complexity = 16 # C901
+
+[lint.pylint]
+max-args = 17            # PLR0913
+max-branches = 12        # PLR0912
+max-positional-args = 24 #  PLR0917
+max-public-methods = 36  # PLR0904
+max-returns = 6          # PLR0911
+max-statements = 43      # PLR0915

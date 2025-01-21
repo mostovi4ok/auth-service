@@ -1,0 +1,8 @@
+typings/
+__pycache__/
+
+.ruff_cache/
+__pycache__/
+.cache/
+.pytest_cache/
+

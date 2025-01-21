@@ -1,0 +1,9 @@
+.venv
+.ruff_cache/
+__pycache__/
+.bash_history
+.cache/
+.pytest_cache/
+.python_history
+.env
+.postgres_auth.env
