@@ -52,7 +52,7 @@ services:
     pull_policy: never
     restart: unless-stopped
     volumes:
-      - .//:/app/
+      - .:/app/
     depends_on:
       postgres_auth:
         condition: service_healthy
