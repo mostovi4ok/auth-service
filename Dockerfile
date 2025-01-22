@@ -1,10 +1,8 @@
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    DEBIAN_FRONTEND=noninteractive \
-    TZ=Asia/Novosibirsk \
-    HOME=/app
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Novosibirsk
+ENV HOME=/app
 
 ENV VIRTUAL_ROOT=/venv
 ENV VIRTUAL_ENV=${VIRTUAL_ROOT}/.venv
