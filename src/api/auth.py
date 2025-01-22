@@ -4,12 +4,9 @@ from typing import Annotated
 from typing import cast
 from uuid import UUID
 
-from async_fastapi_jwt_auth.auth_jwt import AuthJWT
-from async_fastapi_jwt_auth.auth_jwt import AuthJWTBearer
 from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import HTTPException
-from fastapi import Request
 from fastapi import Response
 from fastapi import status
 
@@ -18,6 +15,9 @@ from src.api.models import ChangePasswordModel
 from src.api.models import LoginModel
 from src.api.models import SecureAccountModel
 from src.core.config import jwt_config
+from src.jwt_auth_helpers import Cookie
+from src.jwt_auth_helpers import CustomAuthJWT
+from src.jwt_auth_helpers import CustomAuthJWTBearer
 from src.services.jwt_service import JWTService
 from src.services.jwt_service import TokenData
 from src.services.jwt_service import get_jwt_service
@@ -31,7 +31,7 @@ from src.services.user_service import get_user_service
 
 
 router = APIRouter()
-auth_dep = AuthJWTBearer()
+auth_dep = CustomAuthJWTBearer()
 auth_tags_metadata = {"name": "Авторизация", "description": "Авторизация в API."}
 
 
@@ -68,13 +68,11 @@ async def register(
     tags=["Авторизация"],
 )
 async def login(
-    request: Request,
     account: LoginModel,
     user_service: Annotated[UserService, Depends(get_user_service)],
     password_service: Annotated[PasswordService, Depends(get_password_service)],
-) -> Response:
-    response = Response()
-    jwt = AuthJWT(request, response)
+    jwt: Annotated[CustomAuthJWT, Depends()],
+) -> None:
     if (user := await user_service.get_user(account.login)) is None or not await password_service.check_password(
         account.password, user.password
     ):
@@ -87,7 +85,9 @@ async def login(
 
     await jwt.set_access_cookies(access_token)
     await jwt.set_refresh_cookies(refresh_token)
-    return response
+    raw = await jwt.get_raw_jwt(access_token) or {}
+    exp = raw.get("exp", "")
+    await jwt.set_cookies(Cookie(key="exp", value=str(exp)))
 
 
 @router.get(
@@ -99,7 +99,7 @@ async def login(
 )
 async def logout(
     redis: Annotated[RedisService, Depends(get_service_redis)],
-    authorize: Annotated[AuthJWT, Depends(auth_dep)],
+    authorize: Annotated[CustomAuthJWT, Depends(auth_dep)],
     jwt: Annotated[JWTService, Depends(get_jwt_service)],
 ) -> None:
     await authorize.jwt_required()
@@ -131,7 +131,7 @@ async def logout(
 )
 async def logout_all(
     redis: Annotated[RedisService, Depends(get_service_redis)],
-    authorize: Annotated[AuthJWT, Depends(auth_dep)],
+    authorize: Annotated[CustomAuthJWT, Depends(auth_dep)],
     jwt: Annotated[JWTService, Depends(get_jwt_service)],
 ) -> None:
     await authorize.jwt_required()
@@ -159,7 +159,7 @@ async def change_password(
     data: ChangePasswordModel,
     password_service: Annotated[PasswordService, Depends(get_password_service)],
     user_service: Annotated[UserService, Depends(get_user_service)],
-    authorize: Annotated[AuthJWT, Depends(auth_dep)],
+    authorize: Annotated[CustomAuthJWT, Depends(auth_dep)],
     jwt: Annotated[JWTService, Depends(get_jwt_service)],
 ) -> Response:
     await authorize.jwt_required()
@@ -189,7 +189,7 @@ async def change_password(
 async def delete(
     redis: Annotated[RedisService, Depends(get_service_redis)],
     user_service: Annotated[UserService, Depends(get_user_service)],
-    authorize: Annotated[AuthJWT, Depends(auth_dep)],
+    authorize: Annotated[CustomAuthJWT, Depends(auth_dep)],
     jwt: Annotated[JWTService, Depends(get_jwt_service)],
 ) -> Response:
     await authorize.jwt_required()
@@ -219,7 +219,7 @@ async def delete(
     tags=["Авторизация"],
 )
 async def refresh(
-    authorize: Annotated[AuthJWT, Depends(auth_dep)],
+    authorize: Annotated[CustomAuthJWT, Depends(auth_dep)],
     jwt: Annotated[JWTService, Depends(get_jwt_service)],
 ) -> None:
     await authorize.jwt_refresh_token_required()
@@ -238,6 +238,9 @@ async def refresh(
     )
 
     await authorize.set_access_cookies(new_access_token)
+    raw = await authorize.get_raw_jwt(new_access_token) or {}
+    exp = raw.get("exp", "")
+    await authorize.set_cookies(Cookie(key="exp", value=str(exp)))
 
 
 @router.get(
@@ -248,7 +251,7 @@ async def refresh(
     tags=["Авторизация"],
 )
 async def checkout_access(
-    authorize: Annotated[AuthJWT, Depends(auth_dep)],
+    authorize: Annotated[CustomAuthJWT, Depends(auth_dep)],
     jwt: Annotated[JWTService, Depends(get_jwt_service)],
 ) -> None:
     await authorize.jwt_required()

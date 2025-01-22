@@ -4,11 +4,11 @@ from typing import Annotated
 from typing import cast
 from uuid import UUID
 
-from async_fastapi_jwt_auth.auth_jwt import AuthJWT
 from fastapi import Depends
 from fastapi.exceptions import HTTPException
 from starlette import status
 
+from src.jwt_auth_helpers import CustomAuthJWT
 from src.services.redis_service import Key
 from src.services.redis_service import RedisService
 from src.services.redis_service import get_service_redis
@@ -42,7 +42,7 @@ class JWTService:
             detail = f"{name_token} token banned"
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
 
-    async def get_access_token_data(self, jwt: AuthJWT) -> TokenData:
+    async def get_access_token_data(self, jwt: CustomAuthJWT) -> TokenData:
         token = cast(str, jwt._token)
         raw_token = cast(dict[str, str | int | bool], await jwt.get_raw_jwt())
         return TokenData(

@@ -2,7 +2,6 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from async_fastapi_jwt_auth.auth_jwt import AuthJWT
 from async_fastapi_jwt_auth.exceptions import AuthJWTException
 from fastapi import Depends
 from fastapi import FastAPI
@@ -19,7 +18,9 @@ from src.core.config import configs
 from src.core.config import jwt_config
 from src.core.logger import setup_root_logger
 from src.db import redis_db
+from src.jwt_auth_helpers import CustomAuthJWT
 from src.jwt_auth_helpers import check_permissions
+from src.middleware.middleware import setup_middleware
 from src.models.errors import ErrorBody
 from src.services.custom_error import ResponseError
 
@@ -27,7 +28,7 @@ from src.services.custom_error import ResponseError
 setup_root_logger()
 
 
-@AuthJWT.load_config
+@CustomAuthJWT.load_config
 def get_config() -> JWTConfig:
     return jwt_config
 
@@ -61,6 +62,8 @@ app = FastAPI(
     responses=responses,
     lifespan=lifespan,
 )
+
+setup_middleware(app)
 
 
 @app.exception_handler(ResponseError)
