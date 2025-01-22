@@ -9,22 +9,24 @@ from fastapi import HTTPException
 from fastapi import status
 
 from src.core.config import configs
-from src.services.rights_management_service import RightsManagementService
-from src.services.rights_management_service import get_rights_management_service
+from src.services.permission_management_service import PermissionManagementService
+from src.services.permission_management_service import get_permission_management_service
 
 
 auth_dep = AuthJWTBearer()
 
 
-async def check_rights(
+async def check_permissions(
     jwt: Annotated[AuthJWT, Depends(auth_dep)],
-    rights_management_service: Annotated[RightsManagementService, Depends(get_rights_management_service)],
+    permission_management_service: Annotated[PermissionManagementService, Depends(get_permission_management_service)],
 ) -> None:
     await jwt.jwt_required()
     access = await jwt.get_raw_jwt() or {}
-    rights_user = set(map(UUID, cast(list[str], access.get("rights", []))))
-    all_rights = await rights_management_service.get_all()
+    permissions_user = set(map(UUID, cast(list[str], access.get("permissions", []))))
+    all_permissions = await permission_management_service.get_all()
 
-    required_rights = {right.id for right in all_rights.rights if right.name in configs.names_right}
-    if not rights_user or any(right not in rights_user for right in required_rights):
+    required_permissions = {
+        permission.id for permission in all_permissions.permissions if permission.name in configs.names_permission
+    }
+    if not permissions_user or any(permission not in permissions_user for permission in required_permissions):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав")

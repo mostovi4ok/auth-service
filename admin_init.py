@@ -8,12 +8,12 @@ from typer import Exit
 from typer import Typer
 
 from src.core.config import configs
-from src.models.alchemy_model import RightOrm
+from src.models.alchemy_model import PermissionOrm
 from src.models.alchemy_model import UserOrm
 from src.services.password_service import get_password_service
 
 
-NAME_RIGHT = "admin"
+NAME_PERMISSION = "admin"
 
 engine = create_engine(configs.postgres_dsn)
 ps = get_password_service()
@@ -42,27 +42,27 @@ def create_admin(
     password: str,
 ) -> None:
     with Session(engine) as pg_session:
-        admin_right = pg_session.scalars(select(RightOrm).where(RightOrm.name == NAME_RIGHT)).first()
-        if not admin_right:
-            admin_right = RightOrm(name=NAME_RIGHT, description="admin right allows everything")
-            pg_session.add(admin_right)
+        admin_permission = pg_session.scalars(select(PermissionOrm).where(PermissionOrm.name == NAME_PERMISSION)).first()
+        if not admin_permission:
+            admin_permission = PermissionOrm(name=NAME_PERMISSION, description="admin permission allows everything")
+            pg_session.add(admin_permission)
 
         admin_user = create_admin_user(pg_session, login, password)
-        admin_user.rights.append(admin_right)
+        admin_user.permissions.append(admin_permission)
         pg_session.commit()
 
 
 @app.command()
 def delete_admin(login: str) -> None:
     with Session(engine) as session:
-        admin_right = session.scalars(select(RightOrm).where(RightOrm.name == NAME_RIGHT)).first()
-        num_admins = len(session.execute(select(UserOrm).where(UserOrm.rights.contains(admin_right))).all())
+        admin_permission = session.scalars(select(PermissionOrm).where(PermissionOrm.name == NAME_PERMISSION)).first()
+        num_admins = len(session.execute(select(UserOrm).where(UserOrm.permissions.contains(admin_permission))).all())
         admin_user = session.scalars(select(UserOrm).where(UserOrm.login == login)).first()
         if not admin_user:
             raise Exit
 
         if num_admins == 1:
-            session.delete(admin_right)
+            session.delete(admin_permission)
 
         session.delete(admin_user)
         session.commit()

@@ -4,27 +4,27 @@ from pydantic import BaseModel
 from pydantic import Field
 
 
-class CreateRightModel(BaseModel):
+class CreatePermissionModel(BaseModel):
     name: str = Field(description="Название права", title="Название")
     description: str | None = Field(default=None, description="Описание права", title="Описание")
 
 
-class SearchRightModel(BaseModel):
+class SearchPermissionModel(BaseModel):
     id: UUID | None = Field(default=None, description="Идентификатор права", title="Идентификатор")
     name: str | None = Field(default=None, description="Название права", title="Название")
 
 
-class ChangeRightModel(BaseModel):
+class ChangePermissionModel(BaseModel):
     name: str | None = Field(default=None, description="Новое название права", title="Новое название")
     description: str | None = Field(default=None, description="Новое описание права", title="Новое описание")
 
 
-class RightModel(CreateRightModel):
+class PermissionModel(CreatePermissionModel):
     id: UUID = Field(description="Идентификатор права", title="Идентификатор")
 
 
-class RightsModel(BaseModel):
-    rights: list[RightModel] = Field(description="Список прав", title="Список прав")
+class PermissionsModel(BaseModel):
+    permissions: list[PermissionModel] = Field(description="Список прав", title="Список прав")
 
 
 class UserModel(BaseModel):
@@ -35,4 +35,4 @@ class UserModel(BaseModel):
 class ResponseUserModel(BaseModel):
     id: UUID = Field(description="Идентификатор юзера", title="Идентификатор")
     login: str = Field(description="Логин юзера", title="Логин")
-    rights: list[RightModel] = Field(description="Права юзера", title="Права")
+    permissions: list[PermissionModel] = Field(description="Права юзера", title="Права")

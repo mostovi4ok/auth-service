@@ -111,13 +111,6 @@ preview = true
 [lint.pycodestyle]
 max-line-length = 120
 
-[lint.pyflakes]
-extend-generics = [
-    "django.db.models.ForeignKey",
-    "django.db.models.Manager",
-    "django.db.models.Model",
-]
-
 [lint.flake8-builtins]
 builtins-ignorelist = [
     "exit",
@@ -146,14 +139,7 @@ runtime-evaluated-base-classes = [
     "pydantic_settings.BaseSettings",
     "pydantic.BaseModel",
 ]
-runtime-evaluated-decorators = [
-    "pydantic.dataclasses.dataclass",
-    "r.core.py.types.runtime.runtime_typing",
-    "r.core.typed_ns.doors.ns_caller",
-    "r.core.typed_ns.includer.include",
-    "r.core.typed_ns.includer.include_frozen",
-    "r.core.typed_ns.namespacer.namespace",
-]
+
 strict = true
 
 [lint.isort]

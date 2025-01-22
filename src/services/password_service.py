@@ -2,7 +2,6 @@ import os
 from base64 import urlsafe_b64decode
 from base64 import urlsafe_b64encode
 from dataclasses import dataclass
-from functools import lru_cache
 from hashlib import pbkdf2_hmac
 
 from src.core.config import configs
@@ -44,6 +43,5 @@ class PasswordService:
         ).password_hash == target_hash.password_hash
 
 
-@lru_cache
 def get_password_service() -> PasswordService:
     return PasswordService()

@@ -1,4 +1,3 @@
-from functools import lru_cache
 from typing import Annotated
 from uuid import UUID
 
@@ -22,7 +21,7 @@ class UserService:
     async def get_user(self, login: str, is_deleted: bool = False) -> UserOrm | None:
         stmt = (
             select(UserOrm)
-            .options(selectinload(UserOrm.rights))
+            .options(selectinload(UserOrm.permissions))
             .where(UserOrm.login == login, UserOrm.is_deleted == is_deleted)
         )
         result = await self.session.execute(stmt)
@@ -30,7 +29,9 @@ class UserService:
 
     async def get_user_by_id(self, id_: UUID) -> UserOrm | None:
         stmt = (
-            select(UserOrm).options(selectinload(UserOrm.rights)).where(UserOrm.id == id_, UserOrm.is_deleted == False)  # noqa: E712
+            select(UserOrm)
+            .options(selectinload(UserOrm.permissions))
+            .where(UserOrm.id == id_, UserOrm.is_deleted == False)  # noqa: E712
         )
         result = await self.session.execute(stmt)
         return result.scalars().first()
@@ -54,7 +55,7 @@ class UserService:
 
     async def delete_user(self, user: UserOrm) -> None:
         user.is_deleted = True
-        user.rights.clear()
+        user.permissions.clear()
         self.session.add(user)
         await self.session.commit()
 
@@ -64,7 +65,6 @@ class UserService:
         await self.session.refresh(user)
 
 
-@lru_cache
 def get_user_service(
     postgres: Annotated[AsyncSession, Depends(get_session)],
     password: Annotated[PasswordService, Depends(get_password_service)],

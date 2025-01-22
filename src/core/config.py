@@ -24,11 +24,11 @@ class Configs(BaseSettings):
     redis_host: str = Field(alias="REDIS_HOST")
     redis_port: int = Field(alias="REDIS_PORT")
 
-    right_names: list[str] = Field(alias="RIGHT_NAMES")
+    permission_names: list[str] = Field(alias="PERMISSION_NAMES")
 
     @property
-    def names_right(self) -> set[str]:
-        return set(self.right_names)
+    def names_permission(self) -> set[str]:
+        return set(self.permission_names)
 
     iters_password: int = Field(alias="ITERS_PASSWORD")
     hash_name_password: str = Field(alias="HASH_NAME_PASSWORD")

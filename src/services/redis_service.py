@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from functools import lru_cache
 from pickle import HIGHEST_PROTOCOL as PICKLE_HIGHEST_PROTOCOL  # noqa: S403
 from pickle import dumps as pickle_dumps  # noqa: S403
 from pickle import loads as pickle_loads  # noqa: S403
@@ -62,6 +61,5 @@ class RedisService:
         await pipe.execute()
 
 
-@lru_cache
 def get_service_redis(redis: Annotated[Redis, Depends(get_redis)]) -> RedisService:
     return RedisService(redis)

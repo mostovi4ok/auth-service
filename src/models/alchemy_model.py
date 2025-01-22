@@ -1,6 +1,5 @@
 import uuid
 from datetime import datetime
-from typing import Any
 
 from sqlalchemy import UUID
 from sqlalchemy import Boolean
@@ -26,11 +25,11 @@ class Base(AsyncAttrs, DeclarativeBase):
     pass
 
 
-user_right = Table(
-    "user_right",
+user_permission = Table(
+    "user_permission",
     Base.metadata,
-    Column[Any]("user_id", ForeignKey("user.id", ondelete="CASCADE"), primary_key=True),
-    Column[Any]("right_id", ForeignKey("right.id", ondelete="CASCADE"), primary_key=True),
+    Column[uuid.UUID]("user_id", ForeignKey("user.id", ondelete="CASCADE"), primary_key=True),
+    Column[uuid.UUID]("permission_id", ForeignKey("permission.id", ondelete="CASCADE"), primary_key=True),
 )
 
 
@@ -50,14 +49,16 @@ class UserOrm(Base):
         mapped_column(String(255), nullable=False),
     )
 
-    rights: Mapped[list["RightOrm"]] = relationship(secondary=user_right, back_populates="users", lazy="selectin")
+    permissions: Mapped[list["PermissionOrm"]] = relationship(
+        secondary=user_permission, back_populates="users", lazy="selectin"
+    )
 
     def __repr__(self) -> str:
         return f"User(id={self.id!r}, login={self.login!r})"
 
 
-class RightOrm(Base):
-    __tablename__ = "right"
+class PermissionOrm(Base):
+    __tablename__ = "permission"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(60), unique=True, nullable=False, index=True)
@@ -65,7 +66,9 @@ class RightOrm(Base):
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), default=func.now())
     modified_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
 
-    users: Mapped[list[UserOrm]] = relationship(secondary=user_right, back_populates="rights", lazy="selectin")
+    users: Mapped[list[UserOrm]] = relationship(
+        secondary=user_permission, back_populates="permissions", lazy="selectin"
+    )
 
     def __repr__(self) -> str:
-        return f"Right(id={self.id!r}, name={self.name!r})"
+        return f"Permission(id={self.id!r}, name={self.name!r})"

@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from dataclasses import field
-from functools import lru_cache
 from typing import Annotated
 from typing import cast
 from uuid import UUID
@@ -56,6 +55,5 @@ class JWTService:
         )
 
 
-@lru_cache
 def get_jwt_service(redis: Annotated[RedisService, Depends(get_service_redis)]) -> JWTService:
     return JWTService(redis)

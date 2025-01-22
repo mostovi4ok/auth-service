@@ -1,25 +1,23 @@
 from typing import Annotated
 
-from async_fastapi_jwt_auth.auth_jwt import AuthJWTBearer
 from fastapi import APIRouter
 from fastapi import Body
 from fastapi import Depends
 from fastapi import status
 
-from src.api.models.access_control import ChangeRightModel
-from src.api.models.access_control import CreateRightModel
+from src.api.models.access_control import ChangePermissionModel
+from src.api.models.access_control import CreatePermissionModel
+from src.api.models.access_control import PermissionModel
+from src.api.models.access_control import PermissionsModel
 from src.api.models.access_control import ResponseUserModel
-from src.api.models.access_control import RightModel
-from src.api.models.access_control import RightsModel
-from src.api.models.access_control import SearchRightModel
+from src.api.models.access_control import SearchPermissionModel
 from src.api.models.access_control import UserModel
-from src.services.rights_management_service import RightsManagementService
-from src.services.rights_management_service import get_rights_management_service
+from src.services.permission_management_service import PermissionManagementService
+from src.services.permission_management_service import get_permission_management_service
 
 
-router = APIRouter(prefix="/rights")
-auth_dep = AuthJWTBearer()
-rights_tags_metadata = {"name": "Права", "description": "Управление правами."}
+router = APIRouter()
+permissions_tags_metadata = {"name": "Права", "description": "Управление правами."}
 
 
 @router.post(
@@ -27,14 +25,14 @@ rights_tags_metadata = {"name": "Права", "description": "Управлени
     summary="Создание права",
     description="Создание права",
     response_description="Право создано",
-    responses={status.HTTP_200_OK: {"model": RightModel}},
+    responses={status.HTTP_200_OK: {"model": PermissionModel}},
     tags=["Права"],
 )
 async def create(
-    right: CreateRightModel,
-    rights_management_service: Annotated[RightsManagementService, Depends(get_rights_management_service)],
-) -> RightModel:
-    return await rights_management_service.create(right)
+    permission: CreatePermissionModel,
+    permissions_management_service: Annotated[PermissionManagementService, Depends(get_permission_management_service)],
+) -> PermissionModel:
+    return await permissions_management_service.create(permission)
 
 
 @router.delete(
@@ -45,12 +43,12 @@ async def create(
     tags=["Права"],
 )
 async def delete(
-    right: Annotated[
-        SearchRightModel, Body(description="Минимум одно поле должно быть заполненно", title="Право для удаления")
+    permission: Annotated[
+        SearchPermissionModel, Body(description="Минимум одно поле должно быть заполненно", title="Право для удаления")
     ],
-    rights_management_service: Annotated[RightsManagementService, Depends(get_rights_management_service)],
+    permissions_management_service: Annotated[PermissionManagementService, Depends(get_permission_management_service)],
 ) -> str:
-    return await rights_management_service.delete(right)
+    return await permissions_management_service.delete(permission)
 
 
 @router.put(
@@ -58,19 +56,19 @@ async def delete(
     summary="Изменение права",
     description="Изменение права",
     response_description="Право изменено",
-    responses={status.HTTP_200_OK: {"model": RightModel}},
+    responses={status.HTTP_200_OK: {"model": PermissionModel}},
     tags=["Права"],
 )
 async def update(
-    right_old: Annotated[
-        SearchRightModel, Body(description="Минимум одно поле должно быть заполненно", title="Право для замены")
+    permission_old: Annotated[
+        SearchPermissionModel, Body(description="Минимум одно поле должно быть заполненно", title="Право для замены")
     ],
-    right_new: Annotated[
-        ChangeRightModel, Body(description="Минимум одно поле должно быть заполненно", title="Новый данные права")
+    permission_new: Annotated[
+        ChangePermissionModel, Body(description="Минимум одно поле должно быть заполненно", title="Новый данные права")
     ],
-    rights_management_service: Annotated[RightsManagementService, Depends(get_rights_management_service)],
-) -> RightModel:
-    return await rights_management_service.update(right_old, right_new)
+    permissions_management_service: Annotated[PermissionManagementService, Depends(get_permission_management_service)],
+) -> PermissionModel:
+    return await permissions_management_service.update(permission_old, permission_new)
 
 
 @router.get(
@@ -78,13 +76,13 @@ async def update(
     summary="Просмотр всех прав",
     description="Просмотр всех прав",
     response_description="Список прав",
-    responses={status.HTTP_200_OK: {"model": RightsModel}},
+    responses={status.HTTP_200_OK: {"model": PermissionsModel}},
     tags=["Права"],
 )
 async def get_all(
-    rights_management_service: Annotated[RightsManagementService, Depends(get_rights_management_service)],
-) -> RightsModel:
-    return await rights_management_service.get_all()
+    permissions_management_service: Annotated[PermissionManagementService, Depends(get_permission_management_service)],
+) -> PermissionsModel:
+    return await permissions_management_service.get_all()
 
 
 @router.post(
@@ -96,11 +94,13 @@ async def get_all(
     tags=["Права"],
 )
 async def assign(
-    right: Annotated[SearchRightModel, Body(description="Минимум одно поле должно быть заполненно", title="Право")],
+    permission: Annotated[
+        SearchPermissionModel, Body(description="Минимум одно поле должно быть заполненно", title="Право")
+    ],
     user: Annotated[UserModel, Body(description="Минимум одно поле должно быть заполненно", title="Юзер")],
-    rights_management_service: Annotated[RightsManagementService, Depends(get_rights_management_service)],
+    permissions_management_service: Annotated[PermissionManagementService, Depends(get_permission_management_service)],
 ) -> ResponseUserModel:
-    return await rights_management_service.assign(right, user)
+    return await permissions_management_service.assign(permission, user)
 
 
 @router.delete(
@@ -112,23 +112,25 @@ async def assign(
     tags=["Права"],
 )
 async def take_away(
-    right: Annotated[SearchRightModel, Body(description="Минимум одно поле должно быть заполненно", title="Право")],
+    permission: Annotated[
+        SearchPermissionModel, Body(description="Минимум одно поле должно быть заполненно", title="Право")
+    ],
     user: Annotated[UserModel, Body(description="Минимум одно поле должно быть заполненно", title="Юзер")],
-    rights_management_service: Annotated[RightsManagementService, Depends(get_rights_management_service)],
+    permissions_management_service: Annotated[PermissionManagementService, Depends(get_permission_management_service)],
 ) -> ResponseUserModel:
-    return await rights_management_service.take_away(right, user)
+    return await permissions_management_service.take_away(permission, user)
 
 
 @router.post(
-    "/get_user_rights",
+    "/get_user_permissions",
     summary="Получить права пользователя",
     description="Минимум один параметр должен быть заполнен.",
     response_description="Права пользователя",
-    responses={status.HTTP_200_OK: {"model": RightsModel}},
+    responses={status.HTTP_200_OK: {"model": PermissionsModel}},
     tags=["Права"],
 )
-async def get_user_rights(
+async def get_user_permissions(
     user: Annotated[UserModel, Body(description="Минимум одно поле должно быть заполненно", title="Юзер")],
-    rights_management_service: Annotated[RightsManagementService, Depends(get_rights_management_service)],
-) -> RightsModel:
-    return await rights_management_service.get_user_rights(user)
+    permissions_management_service: Annotated[PermissionManagementService, Depends(get_permission_management_service)],
+) -> PermissionsModel:
+    return await permissions_management_service.get_user_permissions(user)

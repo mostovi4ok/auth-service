@@ -9,8 +9,9 @@ from async_fastapi_jwt_auth.auth_jwt import AuthJWTBearer
 from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import HTTPException
+from fastapi import Request
+from fastapi import Response
 from fastapi import status
-from fastapi.responses import Response
 
 from src.api.models import AccountModel
 from src.api.models import ChangePasswordModel
@@ -48,7 +49,7 @@ async def register(
     if not data.login:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Нужен логин")
 
-    if not data.login:
+    if not data.password:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Нужен пароль")
 
     if await user_service.get_user(data.login):
@@ -67,23 +68,26 @@ async def register(
     tags=["Авторизация"],
 )
 async def login(
+    request: Request,
     account: LoginModel,
     user_service: Annotated[UserService, Depends(get_user_service)],
     password_service: Annotated[PasswordService, Depends(get_password_service)],
-    authorize: Annotated[AuthJWT, Depends(auth_dep)],
-) -> None:
+) -> Response:
+    response = Response()
+    jwt = AuthJWT(request, response)
     if (user := await user_service.get_user(account.login)) is None or not await password_service.check_password(
         account.password, user.password
     ):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Неверный логин или пароль")
 
-    rights = {"rights": [str(right.id) for right in user.rights]}
+    permission = {"permissions": [str(permission.id) for permission in user.permissions]}
     user_id = str(user.id)
-    access_token = await authorize.create_access_token(subject=user_id, user_claims=rights)
-    refresh_token = await authorize.create_refresh_token(subject=user_id, user_claims=rights)
+    access_token = await jwt.create_access_token(subject=user_id, user_claims=permission)
+    refresh_token = await jwt.create_refresh_token(subject=user_id, user_claims=permission)
 
-    await authorize.set_access_cookies(access_token)
-    await authorize.set_refresh_cookies(refresh_token)
+    await jwt.set_access_cookies(access_token)
+    await jwt.set_refresh_cookies(refresh_token)
+    return response
 
 
 @router.get(
@@ -225,11 +229,13 @@ async def refresh(
     iat = cast(int, raw_refresh["iat"])
 
     user_id = cast(UUID, raw_refresh["sub"])
-    rights = cast(str, raw_refresh["rights"])
+    permissions = cast(str, raw_refresh["permissions"])
 
     await jwt.check_banned(TokenData(user_id=user_id, name_token="refresh", token=refresh_token, jti=jti, iat=iat))  # noqa: S106
 
-    new_access_token = await authorize.create_access_token(subject=str(user_id), user_claims={"rights": rights})
+    new_access_token = await authorize.create_access_token(
+        subject=str(user_id), user_claims={"permissions": permissions}
+    )
 
     await authorize.set_access_cookies(new_access_token)
 

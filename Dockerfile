@@ -21,7 +21,7 @@ RUN apt update -y  && apt install \
     nano \
     --no-install-recommends -y && apt clean && rm -rf /var/lib/apt/lists/*
 
-COPY ./pyproject.toml ./.python-version ./uv.lock $VIRTUAL_ROOT/
+COPY ./pyproject.toml ./uv.lock $VIRTUAL_ROOT/
 
 RUN uv venv ${VIRTUAL_ENV} --no-python-downloads
 
@@ -38,4 +38,4 @@ EXPOSE 8000
 
 RUN chmod u+x entrypoint.sh
 
-CMD ["/bin/bash", "./entrypoint.sh"]
+CMD ["fastapi", "run", "src/main.py", "--reload"]
