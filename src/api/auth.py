@@ -1,8 +1,6 @@
 from datetime import UTC
 from datetime import datetime
 from typing import Annotated
-from typing import cast
-from uuid import UUID
 
 from fastapi import APIRouter
 from fastapi import Depends
@@ -15,9 +13,9 @@ from src.api.models import ChangePasswordModel
 from src.api.models import LoginModel
 from src.api.models import SecureAccountModel
 from src.core.config import jwt_config
-from src.jwt_auth_helpers import Cookie
-from src.jwt_auth_helpers import CustomAuthJWT
-from src.jwt_auth_helpers import CustomAuthJWTBearer
+from src.custom_auth_jwt import CustomAuthJWT
+from src.custom_auth_jwt import CustomAuthJWTBearer
+from src.models.jwt import RawToken
 from src.services.jwt_service import JWTService
 from src.services.jwt_service import TokenData
 from src.services.jwt_service import get_jwt_service
@@ -71,7 +69,7 @@ async def login(
     account: LoginModel,
     user_service: Annotated[UserService, Depends(get_user_service)],
     password_service: Annotated[PasswordService, Depends(get_password_service)],
-    jwt: Annotated[CustomAuthJWT, Depends()],
+    authorize: Annotated[CustomAuthJWT, Depends()],
 ) -> None:
     if (user := await user_service.get_user(account.login)) is None or not await password_service.check_password(
         account.password, user.password
@@ -80,14 +78,11 @@ async def login(
 
     permission = {"permissions": [str(permission.id) for permission in user.permissions]}
     user_id = str(user.id)
-    access_token = await jwt.create_access_token(subject=user_id, user_claims=permission)
-    refresh_token = await jwt.create_refresh_token(subject=user_id, user_claims=permission)
+    access_token = await authorize.create_access_token(subject=user_id, user_claims=permission)
+    refresh_token = await authorize.create_refresh_token(subject=user_id, user_claims=permission)
 
-    await jwt.set_access_cookies(access_token)
-    await jwt.set_refresh_cookies(refresh_token)
-    raw = await jwt.get_raw_jwt(access_token) or {}
-    exp = raw.get("exp", "")
-    await jwt.set_cookies(Cookie(key="exp", value=str(exp)))
+    await authorize.set_access_cookies(access_token, max_age=jwt_config.authjwt_access_token_expires)
+    await authorize.set_refresh_cookies(refresh_token, max_age=jwt_config.authjwt_refresh_token_expires)
 
 
 @router.get(
@@ -103,21 +98,17 @@ async def logout(
     jwt: Annotated[JWTService, Depends(get_jwt_service)],
 ) -> None:
     await authorize.jwt_required()
-    token_data = await jwt.get_access_token_data(authorize)
-    user_id = token_data.user_id
+    access_data = await jwt.get_token_data(authorize)
 
-    await jwt.check_banned(token_data)
+    await jwt.check_banned(access_data)
 
     await authorize.jwt_refresh_token_required()
-    refresh_token = cast(str, authorize._token)
-    jti_refresh = await authorize.get_jti(refresh_token)
-    raw_refresh = cast(dict[str, str | int | bool], await authorize.get_raw_jwt())
+    refresh_data = await jwt.get_token_data(authorize)
 
+    user_id = access_data.user_id
     now = int(datetime.now(UTC).timestamp())
-    await redis.set(
-        Key("access_banned", user_id, token_data.jti), token_data.token, cast(int, token_data.raw_token["exp"]) - now
-    )
-    await redis.set(Key("refresh_banned", user_id, jti_refresh), refresh_token, cast(int, raw_refresh["exp"]) - now)
+    await redis.set(Key("access_banned", user_id, access_data.jti), access_data.token, access_data.exp - now)
+    await redis.set(Key("refresh_banned", user_id, refresh_data.jti), refresh_data.token, refresh_data.exp - now)
 
     await authorize.unset_jwt_cookies()
 
@@ -135,7 +126,7 @@ async def logout_all(
     jwt: Annotated[JWTService, Depends(get_jwt_service)],
 ) -> None:
     await authorize.jwt_required()
-    token_data = await jwt.get_access_token_data(authorize)
+    token_data = await jwt.get_token_data(authorize)
     user_id = token_data.user_id
 
     await jwt.check_banned(token_data)
@@ -163,7 +154,7 @@ async def change_password(
     jwt: Annotated[JWTService, Depends(get_jwt_service)],
 ) -> Response:
     await authorize.jwt_required()
-    access_token_data = await jwt.get_access_token_data(authorize)
+    access_token_data = await jwt.get_token_data(authorize)
     user_id = access_token_data.user_id
 
     await jwt.check_banned(access_token_data)
@@ -193,7 +184,7 @@ async def delete(
     jwt: Annotated[JWTService, Depends(get_jwt_service)],
 ) -> Response:
     await authorize.jwt_required()
-    token_data = await jwt.get_access_token_data(authorize)
+    token_data = await jwt.get_token_data(authorize)
     user_id = token_data.user_id
 
     await jwt.check_banned(token_data)
@@ -223,24 +214,30 @@ async def refresh(
     jwt: Annotated[JWTService, Depends(get_jwt_service)],
 ) -> None:
     await authorize.jwt_refresh_token_required()
-    refresh_token = cast(str, authorize._token)
-    jti = await authorize.get_jti(refresh_token)
-    raw_refresh = cast(dict[str, str | int | bool], await authorize.get_raw_jwt())
-    iat = cast(int, raw_refresh["iat"])
+    refresh_token = authorize.token
+    raw_jwt = await authorize.get_raw_jwt()
+    assert raw_jwt is not None
+    raw_refresh = RawToken.model_validate(raw_jwt)
 
-    user_id = cast(UUID, raw_refresh["sub"])
-    permissions = cast(str, raw_refresh["permissions"])
+    user_id = raw_refresh.sub
+    permissions = list(map(str, raw_refresh.permissions))
 
-    await jwt.check_banned(TokenData(user_id=user_id, name_token="refresh", token=refresh_token, jti=jti, iat=iat))  # noqa: S106
+    await jwt.check_banned(
+        TokenData(
+            user_id=user_id,
+            type=raw_refresh.type,
+            token=refresh_token,
+            jti=str(raw_refresh.jti),
+            iat=raw_refresh.iat,
+            exp=raw_refresh.exp,
+        )
+    )
 
     new_access_token = await authorize.create_access_token(
         subject=str(user_id), user_claims={"permissions": permissions}
     )
 
-    await authorize.set_access_cookies(new_access_token)
-    raw = await authorize.get_raw_jwt(new_access_token) or {}
-    exp = raw.get("exp", "")
-    await authorize.set_cookies(Cookie(key="exp", value=str(exp)))
+    await authorize.set_access_cookies(new_access_token, max_age=jwt_config.authjwt_access_token_expires)
 
 
 @router.get(
@@ -255,6 +252,6 @@ async def checkout_access(
     jwt: Annotated[JWTService, Depends(get_jwt_service)],
 ) -> None:
     await authorize.jwt_required()
-    token_data = await jwt.get_access_token_data(authorize)
+    token_data = await jwt.get_token_data(authorize)
 
     await jwt.check_banned(token_data)

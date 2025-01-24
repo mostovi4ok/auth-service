@@ -33,12 +33,12 @@ class RedisService:
         self.redis = redis
 
     @backoff.on_exception(backoff.expo, RedisConnectionError, max_tries=10)
-    async def get(self, key: Key, default: Plug) -> Any | Plug | None:
+    async def get(self, key: Key, plug: Plug) -> Any | Plug | None:
         if (data := await self.redis.get(str(key))) is None:
             return None
 
         result = pickle_loads(data)[0]  # noqa: S301
-        return default if result is None else result
+        return plug if result is None else result
 
     @backoff.on_exception(backoff.expo, RedisConnectionError, max_tries=10)
     async def set(self, key: Key, value: Any, expire: ExpiryT | None = None) -> None:

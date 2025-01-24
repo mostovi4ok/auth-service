@@ -40,16 +40,14 @@ class PermissionManagementService:
 
     async def create(self, new_right: CreatePermissionModel) -> PermissionModel:
         stmt = select(PermissionOrm).where(PermissionOrm.name == new_right.name)
-        try:
-            (await self.session.scalars(stmt)).one()
-        except NoResultFound:
-            right = PermissionOrm(**new_right.model_dump())
-            self.session.add(right)
-            await self.session.commit()
-            await self.session.refresh(right)
-            return PermissionModel(id=right.id, name=right.name, description=right.description)
+        if (await self.session.scalars(stmt)).first() is not None:
+            raise ResponseError(f"Право с названием '{new_right.name}' уже существует")
 
-        raise ResponseError(f"Право с названием '{new_right.name}' уже существует")
+        right = PermissionOrm(**new_right.model_dump())
+        self.session.add(right)
+        await self.session.commit()
+        await self.session.refresh(right)
+        return PermissionModel(id=right.id, name=right.name, description=right.description)
 
     async def delete(self, right: SearchPermissionModel) -> str:
         if not right.model_dump(exclude_none=True):

@@ -42,7 +42,9 @@ def create_admin(
     password: str,
 ) -> None:
     with Session(engine) as pg_session:
-        admin_permission = pg_session.scalars(select(PermissionOrm).where(PermissionOrm.name == NAME_PERMISSION)).first()
+        admin_permission = pg_session.scalars(
+            select(PermissionOrm).where(PermissionOrm.name == NAME_PERMISSION)
+        ).first()
         if not admin_permission:
             admin_permission = PermissionOrm(name=NAME_PERMISSION, description="admin permission allows everything")
             pg_session.add(admin_permission)

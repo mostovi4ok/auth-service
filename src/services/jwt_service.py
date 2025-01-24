@@ -1,27 +1,16 @@
-from dataclasses import dataclass
-from dataclasses import field
 from typing import Annotated
 from typing import cast
-from uuid import UUID
 
 from fastapi import Depends
 from fastapi.exceptions import HTTPException
 from starlette import status
 
-from src.jwt_auth_helpers import CustomAuthJWT
+from src.custom_auth_jwt import CustomAuthJWT
+from src.models.jwt import RawToken
+from src.models.jwt import TokenData
 from src.services.redis_service import Key
 from src.services.redis_service import RedisService
 from src.services.redis_service import get_service_redis
-
-
-@dataclass(slots=True, frozen=True)
-class TokenData:
-    user_id: UUID
-    name_token: str
-    token: str
-    jti: str
-    iat: int
-    raw_token: dict[str, str | int | bool] = field(default_factory=dict)
 
 
 class JWTService:
@@ -30,7 +19,7 @@ class JWTService:
 
     async def check_banned(self, data: TokenData) -> None:
         user_id = data.user_id
-        name_token = data.name_token
+        name_token = data.type
         prefix_general = f"{name_token}_banned"
         plug = object()
         if (
@@ -42,16 +31,18 @@ class JWTService:
             detail = f"{name_token} token banned"
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
 
-    async def get_access_token_data(self, jwt: CustomAuthJWT) -> TokenData:
-        token = cast(str, jwt._token)
-        raw_token = cast(dict[str, str | int | bool], await jwt.get_raw_jwt())
+    async def get_token_data(self, jwt: CustomAuthJWT) -> TokenData:
+        token = jwt.token
+        raw_jwt = cast(dict[str, str | int | bool], await jwt.get_raw_jwt())
+        assert raw_jwt is not None
+        raw_token = RawToken.model_validate(raw_jwt)
         return TokenData(
-            user_id=cast(UUID, await jwt.get_jwt_subject()),
-            name_token="access",  # noqa: S106
+            user_id=raw_token.sub,
+            type=raw_token.type,
             token=token,
-            raw_token=raw_token,
-            jti=await jwt.get_jti(token),
-            iat=cast(int, raw_token["iat"]),
+            jti=str(raw_token.jti),
+            iat=raw_token.iat,
+            exp=raw_token.exp
         )
 
 
