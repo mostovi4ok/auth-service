@@ -34,6 +34,4 @@ COPY . .
 
 EXPOSE 8000
 
-RUN chmod u+x entrypoint.sh
-
 CMD ["fastapi", "run", "src/main.py", "--reload"]
