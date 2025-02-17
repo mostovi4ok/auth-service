@@ -1,3 +1,4 @@
+from dataclasses import asdict
 from datetime import UTC
 from datetime import datetime
 from typing import Annotated
@@ -16,6 +17,7 @@ from src.core.config import jwt_config
 from src.custom_auth_jwt import CustomAuthJWT
 from src.custom_auth_jwt import CustomAuthJWTBearer
 from src.models.jwt import RawToken
+from src.models.jwt import Token
 from src.services.jwt_service import JWTService
 from src.services.jwt_service import TokenData
 from src.services.jwt_service import get_jwt_service
@@ -250,8 +252,10 @@ async def refresh(
 async def checkout_access(
     authorize: Annotated[CustomAuthJWT, Depends(auth_dep)],
     jwt: Annotated[JWTService, Depends(get_jwt_service)],
-) -> None:
+) -> Token:
     await authorize.jwt_required()
     token_data = await jwt.get_token_data(authorize)
 
     await jwt.check_banned(token_data)
+
+    return Token(**asdict(token_data))

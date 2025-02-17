@@ -21,3 +21,11 @@ class TokenData:
     jti: str
     iat: int
     exp: int
+
+
+class Token(BaseModel):
+    user_id: UUID
+    type: str
+    jti: str
+    iat: int
+    exp: int

@@ -61,9 +61,9 @@ services:
         condition: service_healthy
         restart: true
     networks:
-        fuzzy_excel_driver:
-            aliases:
-            - auth_service
+      fuzzy_excel_driver:
+        aliases:
+          - auth_service
     expose:
       - 8000
 
