@@ -1,6 +1,8 @@
+from collections.abc import Iterable
 from typing import Annotated
 from uuid import UUID
 
+from aiohttp import ClientSession
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -35,6 +37,12 @@ class UserService:
         )
         result = await self.session.execute(stmt)
         return result.scalars().first()
+
+    async def transfer_user_to_other_services(self, user_id: UUID, urls: Iterable[str]) -> None:
+        async with ClientSession(conn_timeout=3, read_timeout=10) as session:
+            for url in urls:
+                async with session.post(url, json=str(user_id)):
+                    ...
 
     async def create_user(self, account: AccountModel) -> UserOrm:
         deleted_user = await self.get_user(account.login, True)

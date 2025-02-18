@@ -13,6 +13,7 @@ from src.api.models import AccountModel
 from src.api.models import ChangePasswordModel
 from src.api.models import LoginModel
 from src.api.models import SecureAccountModel
+from src.core.config import configs
 from src.core.config import jwt_config
 from src.custom_auth_jwt import CustomAuthJWT
 from src.custom_auth_jwt import CustomAuthJWTBearer
@@ -55,6 +56,7 @@ async def register(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Логин занят")
 
     user = await user_service.create_user(data)
+    await user_service.transfer_user_to_other_services(user.id, configs.services_depend_user_id)
     return SecureAccountModel.model_validate(user.__dict__)
 
 

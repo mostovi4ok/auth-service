@@ -66,6 +66,8 @@ services:
           - auth_service
     expose:
       - 8000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   nginx:
     container_name: nginx-auth

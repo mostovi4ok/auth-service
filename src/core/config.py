@@ -1,19 +1,31 @@
 import logging
 from logging import Logger
 from pathlib import Path
+from typing import Final
 
 from pydantic import Field
 from pydantic_settings import BaseSettings
 from pydantic_settings import SettingsConfigDict
 
 
-BASE_DIRECTORY = Path()
+BASE_DIRECTORY: Final = Path()
 
 
 class Configs(BaseSettings):
     model_config = SettingsConfigDict(env_file=BASE_DIRECTORY / ".env", extra="allow")
 
     name_app: str = Field(alias="PROJECT_NAME")
+
+    fuzzy_excel_host: str = Field(alias="FUZZY_EXCEL_HOST")
+    fuzzy_excel_port: str = Field(alias="FUZZY_EXCEL_PORT")
+
+    @property
+    def fuzzy_excel_dsn(self) -> str:
+        return f"http://{self.fuzzy_excel_host}:{self.fuzzy_excel_port}"
+
+    @property
+    def services_depend_user_id(self) -> tuple[str]:
+        return (f"{self.fuzzy_excel_dsn}/admin/set_user",)
 
     pg_name: str = Field(alias="POSTGRES_DB", serialization_alias="DB_NAME")
     pg_user: str = Field(alias="POSTGRES_USER", serialization_alias="DB_USER")
@@ -48,6 +60,9 @@ class Configs(BaseSettings):
         return logging.getLogger(self.name_app)
 
 
+configs = Configs()  # pyright: ignore[reportCallIssue]
+
+
 class JWTConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=BASE_DIRECTORY / ".env", extra="allow")
 
@@ -58,5 +73,4 @@ class JWTConfig(BaseSettings):
     authjwt_cookie_csrf_protect: bool = False
 
 
-configs = Configs()  # pyright: ignore[reportCallIssue]
 jwt_config = JWTConfig()  # pyright: ignore[reportCallIssue]

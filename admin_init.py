@@ -1,5 +1,7 @@
 from asyncio import run as asyncio_run
+from typing import Final
 
+import requests
 from sqlalchemy import create_engine
 from sqlalchemy import or_
 from sqlalchemy import select
@@ -13,7 +15,7 @@ from src.models.alchemy_model import UserOrm
 from src.services.password_service import get_password_service
 
 
-NAME_PERMISSION = "admin"
+NAME_PERMISSION: Final = "admin"
 
 engine = create_engine(configs.postgres_dsn)
 ps = get_password_service()
@@ -37,10 +39,7 @@ def create_admin_user(session: Session, name: str, password: str) -> UserOrm:
 
 
 @app.command()
-def create_admin(
-    login: str,
-    password: str,
-) -> None:
+def create_admin(login: str, password: str) -> None:
     with Session(engine) as pg_session:
         admin_permission = pg_session.scalars(
             select(PermissionOrm).where(PermissionOrm.name == NAME_PERMISSION)
@@ -52,6 +51,10 @@ def create_admin(
         admin_user = create_admin_user(pg_session, login, password)
         admin_user.permissions.append(admin_permission)
         pg_session.commit()
+        pg_session.refresh(admin_user)
+
+    for url in configs.services_depend_user_id:
+        requests.post(url, json=str(admin_user.id), timeout=(3, 10))
 
 
 @app.command()
