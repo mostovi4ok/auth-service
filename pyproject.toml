@@ -5,6 +5,7 @@ description = "Service auth"
 readme = "README.md"
 requires-python = "==3.12.8"
 dependencies = [
+    "aiohttp~=3.11.12",
     "alembic~=1.14.0",
     "async-fastapi-jwt-auth~=0.6.6",
     "backoff~=2.2.1",
@@ -13,7 +14,9 @@ dependencies = [
     "psycopg[c]~=3.2.3",
     "pydantic-settings~=2.7.1",
     "redis~=5.2.1",
+    "requests~=2.32.3",
     "sqlalchemy[asyncio]~=2.0.37",
+    "typer~=0.15.1",
 ]
 
 [tool.uv]
