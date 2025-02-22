@@ -24,7 +24,7 @@ from src.core.config import jwt_config
 from src.db.postgres_db import get_session
 from src.models.alchemy_model import PermissionOrm
 from src.models.alchemy_model import UserOrm
-from src.services.custom_error import ResponseError
+from src.services.custom_error import MisdirectedRequestError
 from src.services.redis_service import Key
 from src.services.redis_service import RedisService
 from src.services.redis_service import get_service_redis
@@ -41,7 +41,7 @@ class PermissionManagementService:
     async def create(self, new_right: CreatePermissionModel) -> PermissionModel:
         stmt = select(PermissionOrm).where(PermissionOrm.name == new_right.name)
         if (await self.session.scalars(stmt)).first() is not None:
-            raise ResponseError(f"Право с названием '{new_right.name}' уже существует")
+            raise MisdirectedRequestError(f"Право с названием '{new_right.name}' уже существует")
 
         right = PermissionOrm(**new_right.model_dump())
         self.session.add(right)
@@ -51,13 +51,13 @@ class PermissionManagementService:
 
     async def delete(self, right: SearchPermissionModel) -> str:
         if not right.model_dump(exclude_none=True):
-            raise ResponseError(NOT_ENOUGH_INFO)
+            raise MisdirectedRequestError(NOT_ENOUGH_INFO)
 
         stmt_right = select(PermissionOrm).where(or_(PermissionOrm.name == right.name, PermissionOrm.id == right.id))
         try:
             right_ = (await self.session.scalars(stmt_right)).one()
         except NoResultFound:
-            raise ResponseError(f"Право '{right.name or right.id}' не существует")
+            raise MisdirectedRequestError(f"Право '{right.name or right.id}' не существует")
 
         now = int(datetime.now(UTC).timestamp())
         keys_access_to_redis: dict[Key, int] = {}
@@ -77,7 +77,7 @@ class PermissionManagementService:
 
     async def update(self, right_old: SearchPermissionModel, right_new: ChangePermissionModel) -> PermissionModel:
         if not right_old.model_dump(exclude_none=True) or not right_new.model_dump(exclude_none=True):
-            raise ResponseError(NOT_ENOUGH_INFO)
+            raise MisdirectedRequestError(NOT_ENOUGH_INFO)
 
         stmt = (
             update(PermissionOrm)
@@ -88,9 +88,9 @@ class PermissionManagementService:
         try:
             right = (await self.session.scalars(stmt)).one()
         except NoResultFound:
-            raise ResponseError(f"Право '{right_old.name or right_old.id}' не существует")
+            raise MisdirectedRequestError(f"Право '{right_old.name or right_old.id}' не существует")
         except IntegrityError:
-            raise ResponseError(f"Право с названием '{right_new.name}' уже существует")
+            raise MisdirectedRequestError(f"Право с названием '{right_new.name}' уже существует")
 
         now = int(datetime.now(UTC).timestamp())
         keys_access_to_redis: dict[Key, int] = {}
@@ -115,13 +115,13 @@ class PermissionManagementService:
 
     async def assign(self, right: SearchPermissionModel, user: UserModel) -> ResponseUserModel:
         if not right.model_dump(exclude_none=True) or not user.model_dump(exclude_none=True):
-            raise ResponseError(NOT_ENOUGH_INFO)
+            raise MisdirectedRequestError(NOT_ENOUGH_INFO)
 
         stmt_right = select(PermissionOrm).where(or_(PermissionOrm.name == right.name, PermissionOrm.id == right.id))
         try:
             right_ = (await self.session.scalars(stmt_right)).one()
         except NoResultFound:
-            raise ResponseError(f"Право '{right.name or right.id}' не существует")
+            raise MisdirectedRequestError(f"Право '{right.name or right.id}' не существует")
 
         stmt_user = (
             select(UserOrm)
@@ -136,10 +136,12 @@ class PermissionManagementService:
         try:
             user_ = (await self.session.scalars(stmt_user)).one()
         except NoResultFound:
-            raise ResponseError(f"Пользователь '{user.id or user.login}' не существует")
+            raise MisdirectedRequestError(f"Пользователь '{user.id or user.login}' не существует")
 
         if right_ in user_.permissions:
-            raise ResponseError(f"Пользователь '{user.id or user.login}' уже имеет право '{right.name or right.id}'")
+            raise MisdirectedRequestError(
+                f"Пользователь '{user.id or user.login}' уже имеет право '{right.name or right.id}'"
+            )
 
         user_.permissions.append(right_)
 
@@ -159,13 +161,13 @@ class PermissionManagementService:
 
     async def take_away(self, right: SearchPermissionModel, user: UserModel) -> ResponseUserModel:
         if not right.model_dump(exclude_none=True) or not user.model_dump(exclude_none=True):
-            raise ResponseError(NOT_ENOUGH_INFO)
+            raise MisdirectedRequestError(NOT_ENOUGH_INFO)
 
         stmt_right = select(PermissionOrm).where(or_(PermissionOrm.name == right.name, PermissionOrm.id == right.id))
         try:
             right_ = (await self.session.scalars(stmt_right)).one()
         except NoResultFound:
-            raise ResponseError(f"Право '{right.name or right.id}' не существует")
+            raise MisdirectedRequestError(f"Право '{right.name or right.id}' не существует")
 
         stmt_user = (
             select(UserOrm)
@@ -180,12 +182,14 @@ class PermissionManagementService:
         try:
             user_ = (await self.session.scalars(stmt_user)).one()
         except NoResultFound:
-            raise ResponseError(f"Пользователь '{user.id or user.login}' не существует")
+            raise MisdirectedRequestError(f"Пользователь '{user.id or user.login}' не существует")
 
         try:
             user_.permissions.remove(right_)
         except ValueError:
-            raise ResponseError(f"Пользователь '{user.id or user.login}' не имеет право '{right.name or right.id}'")
+            raise MisdirectedRequestError(
+                f"Пользователь '{user.id or user.login}' не имеет право '{right.name or right.id}'"
+            )
 
         now = int(datetime.now(UTC).timestamp())
         await self.redis.set(Key("access_banned", "all", user_.id), now, jwt_config.authjwt_access_token_expires)
@@ -204,7 +208,7 @@ class PermissionManagementService:
 
     async def get_user_permissions(self, user: UserModel) -> PermissionsModel:
         if not user.model_dump(exclude_none=True):
-            raise ResponseError(NOT_ENOUGH_INFO)
+            raise MisdirectedRequestError(NOT_ENOUGH_INFO)
 
         stmt = (
             select(UserOrm)
@@ -219,7 +223,7 @@ class PermissionManagementService:
         try:
             user_ = (await self.session.scalars(stmt)).one()
         except NoResultFound:
-            raise ResponseError(f"Пользователь '{user.id or user.login}' не существует")
+            raise MisdirectedRequestError(f"Пользователь '{user.id or user.login}' не существует")
 
         return PermissionsModel(
             permissions=[

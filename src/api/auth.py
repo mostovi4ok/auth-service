@@ -1,11 +1,9 @@
 from datetime import UTC
 from datetime import datetime
 from typing import Annotated
-from uuid import UUID
 
 from fastapi import APIRouter
 from fastapi import Depends
-from fastapi import HTTPException
 from fastapi import Response
 from fastapi import status
 
@@ -17,9 +15,9 @@ from src.core.config import configs
 from src.core.config import jwt_config
 from src.custom_auth_jwt import CustomAuthJWT
 from src.custom_auth_jwt import CustomAuthJWTBearer
-from src.models.jwt import RawToken
+from src.models.jwt import Payload
+from src.services.custom_error import ResponseError
 from src.services.jwt_service import JWTService
-from src.services.jwt_service import TokenData
 from src.services.jwt_service import get_jwt_service
 from src.services.password_service import PasswordService
 from src.services.password_service import get_password_service
@@ -30,7 +28,7 @@ from src.services.user_service import UserService
 from src.services.user_service import get_user_service
 
 
-router = APIRouter()
+router = APIRouter(tags=["Авторизация"])
 auth_dep = CustomAuthJWTBearer()
 auth_tags_metadata = {"name": "Авторизация", "description": "Авторизация в API."}
 
@@ -40,20 +38,13 @@ auth_tags_metadata = {"name": "Авторизация", "description": "Авто
     summary="Регистрация пользователя",
     description="Регистрация пользователя",
     response_description="Пользователь зарегистрирован",
-    tags=["Авторизация"],
 )
 async def register(
     data: AccountModel,
     user_service: Annotated[UserService, Depends(get_user_service)],
 ) -> SecureAccountModel:
-    if not data.login:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Нужен логин")
-
-    if not data.password:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Нужен пароль")
-
     if await user_service.get_user(data.login):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Логин занят")
+        raise ResponseError(status.HTTP_409_CONFLICT, "Логин занят")
 
     user = await user_service.create_user(data)
     await user_service.transfer_user_to_other_services(user.id, configs.services_depend_user_id)
@@ -65,8 +56,6 @@ async def register(
     summary="Авторизация пользователя",
     description="Авторизация пользователя",
     response_description="Пользователь авторизован",
-    responses={status.HTTP_401_UNAUTHORIZED: {}},
-    tags=["Авторизация"],
 )
 async def login(
     account: LoginModel,
@@ -77,7 +66,7 @@ async def login(
     if (user := await user_service.get_user(account.login)) is None or not await password_service.check_password(
         account.password, user.password
     ):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Неверный логин или пароль")
+        raise ResponseError(status.HTTP_401_UNAUTHORIZED, "Неверный логин или пароль")
 
     permission = {"permissions": [str(permission.id) for permission in user.permissions]}
     user_id = str(user.id)
@@ -93,7 +82,6 @@ async def login(
     summary="Выход из системы",
     description="Выход из системы",
     response_description="Пользователь вышел из системы",
-    tags=["Авторизация"],
 )
 async def logout(
     redis: Annotated[RedisService, Depends(get_service_redis)],
@@ -101,17 +89,20 @@ async def logout(
     jwt: Annotated[JWTService, Depends(get_jwt_service)],
 ) -> None:
     await authorize.jwt_required()
-    access_data = await jwt.get_token_data(authorize)
+    access_payload = await authorize.get_payload()
 
-    await jwt.check_banned(access_data)
+    if await jwt.check_banned(access_payload):
+        await authorize.raise_banned_jwt(access_payload.type)
 
     await authorize.jwt_refresh_token_required()
-    refresh_data = await jwt.get_token_data(authorize)
+    refresh_payload = await authorize.get_payload()
 
-    user_id = access_data.user_id
+    user_id = access_payload.user_id
+    access_jti = access_payload.jti
+    refresh_jti = refresh_payload.jti
     now = int(datetime.now(UTC).timestamp())
-    await redis.set(Key("access_banned", user_id, access_data.jti), access_data.token, access_data.exp - now)
-    await redis.set(Key("refresh_banned", user_id, refresh_data.jti), refresh_data.token, refresh_data.exp - now)
+    await redis.set(Key("access_banned", user_id, access_jti), access_jti, access_payload.exp - now)
+    await redis.set(Key("refresh_banned", user_id, refresh_jti), refresh_jti, refresh_payload.exp - now)
 
     await authorize.unset_jwt_cookies()
 
@@ -121,7 +112,6 @@ async def logout(
     summary="Выход из системы со всех устройств",
     description="Выход из системы со всех устройств",
     response_description="Пользователь вышел со всех устройств",
-    tags=["Авторизация"],
 )
 async def logout_all(
     redis: Annotated[RedisService, Depends(get_service_redis)],
@@ -129,10 +119,11 @@ async def logout_all(
     jwt: Annotated[JWTService, Depends(get_jwt_service)],
 ) -> None:
     await authorize.jwt_required()
-    token_data = await jwt.get_token_data(authorize)
-    user_id = token_data.user_id
+    payload = await authorize.get_payload()
+    user_id = payload.user_id
 
-    await jwt.check_banned(token_data)
+    if await jwt.check_banned(payload):
+        await authorize.raise_banned_jwt(payload.type)
 
     now = int(datetime.now(UTC).timestamp())
     await redis.set(Key("access_banned", "all", user_id), now, jwt_config.authjwt_access_token_expires)
@@ -147,7 +138,6 @@ async def logout_all(
     description="Изменение пароля",
     response_description="Пароль изменён",
     responses={status.HTTP_200_OK: {}, status.HTTP_401_UNAUTHORIZED: {}},
-    tags=["Авторизация"],
 )
 async def change_password(
     data: ChangePasswordModel,
@@ -155,21 +145,21 @@ async def change_password(
     user_service: Annotated[UserService, Depends(get_user_service)],
     authorize: Annotated[CustomAuthJWT, Depends(auth_dep)],
     jwt: Annotated[JWTService, Depends(get_jwt_service)],
-) -> Response:
+) -> None:
     await authorize.jwt_required()
-    access_token_data = await jwt.get_token_data(authorize)
-    user_id = access_token_data.user_id
+    payload = await authorize.get_payload()
+    user_id = payload.user_id
 
-    await jwt.check_banned(access_token_data)
+    if await jwt.check_banned(payload):
+        await authorize.raise_banned_jwt(payload.type)
 
     if (user := await user_service.get_user_by_id(user_id)) is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Аккаунт удалён")
+        raise ResponseError(status.HTTP_401_UNAUTHORIZED, "Аккаунт удалён")
 
     if not await password_service.check_password(data.old_password, user.password):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Неверный пароль")
+        raise ResponseError(status.HTTP_401_UNAUTHORIZED, "Неверный пароль")
 
     await user_service.change_password(user, data.new_password)
-    return Response(status_code=status.HTTP_200_OK)
 
 
 @router.delete(
@@ -178,19 +168,20 @@ async def change_password(
     description="Удаление аккаунта",
     response_description="Аккаунт удалён",
     responses={status.HTTP_204_NO_CONTENT: {}},
-    tags=["Авторизация"],
 )
 async def delete(
     redis: Annotated[RedisService, Depends(get_service_redis)],
     user_service: Annotated[UserService, Depends(get_user_service)],
     authorize: Annotated[CustomAuthJWT, Depends(auth_dep)],
     jwt: Annotated[JWTService, Depends(get_jwt_service)],
-) -> Response:
+    response: Response,
+) -> None:
     await authorize.jwt_required()
-    token_data = await jwt.get_token_data(authorize)
-    user_id = token_data.user_id
+    payload = await authorize.get_payload()
+    user_id = payload.user_id
 
-    await jwt.check_banned(token_data)
+    if await jwt.check_banned(payload):
+        await authorize.raise_banned_jwt(payload.type)
 
     if (user := await user_service.get_user_by_id(user_id)) is not None:
         await user_service.delete_user(user)
@@ -201,7 +192,7 @@ async def delete(
 
     await authorize.unset_jwt_cookies()
 
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    response.status_code = status.HTTP_204_NO_CONTENT
 
 
 @router.get(
@@ -210,34 +201,21 @@ async def delete(
     description="Обновление токенов",
     response_description="Токены обновлены",
     responses={status.HTTP_401_UNAUTHORIZED: {}},
-    tags=["Авторизация"],
 )
 async def refresh(
     authorize: Annotated[CustomAuthJWT, Depends(auth_dep)],
     jwt: Annotated[JWTService, Depends(get_jwt_service)],
 ) -> None:
     await authorize.jwt_refresh_token_required()
-    refresh_token = authorize.token
-    raw_jwt = await authorize.get_raw_jwt()
-    assert raw_jwt is not None
-    raw_refresh = RawToken.model_validate(raw_jwt)
 
-    user_id = raw_refresh.sub
-    permissions = list(map(str, raw_refresh.permissions))
+    payload = await authorize.get_payload()
+    user_id = payload.user_id
 
-    await jwt.check_banned(
-        TokenData(
-            user_id=user_id,
-            type=raw_refresh.type,
-            token=refresh_token,
-            jti=str(raw_refresh.jti),
-            iat=raw_refresh.iat,
-            exp=raw_refresh.exp,
-        )
-    )
+    if await jwt.check_banned(payload):
+        await authorize.raise_banned_jwt(payload.type)
 
     new_access_token = await authorize.create_access_token(
-        subject=str(user_id), user_claims={"permissions": permissions}
+        subject=str(user_id), user_claims={"permissions": list(map(str, payload.permissions))}
     )
 
     await authorize.set_access_cookies(new_access_token, max_age=jwt_config.authjwt_access_token_expires)
@@ -248,32 +226,32 @@ async def refresh(
     summary="Проверка access токена",
     description="Проверка access токена",
     response_description="Жизнеспособность токена",
-    tags=["Авторизация"],
 )
 async def checkout_access(
     authorize: Annotated[CustomAuthJWT, Depends(auth_dep)],
     jwt: Annotated[JWTService, Depends(get_jwt_service)],
 ) -> None:
     await authorize.jwt_required()
-    token_data = await jwt.get_token_data(authorize)
+    payload = await authorize.get_payload()
 
-    await jwt.check_banned(token_data)
+    if await jwt.check_banned(payload):
+        await authorize.raise_banned_jwt(payload.type)
 
 
 @router.get(
-    "/fetch_user",
-    summary="Проверка access токена",
-    description="Проверка access токена",
-    response_description="Жизнеспособность токена",
-    tags=["Авторизация"],
+    "/get_payload",
+    summary="Проверить access токен и получить его payload",
+    description="Проверить access токен и получить его payload",
+    response_description="Payload",
 )
-async def fetch_user(
+async def get_payload(
     authorize: Annotated[CustomAuthJWT, Depends(auth_dep)],
     jwt: Annotated[JWTService, Depends(get_jwt_service)],
-) -> UUID:
+) -> Payload:
     await authorize.jwt_required()
-    token_data = await jwt.get_token_data(authorize)
+    payload = await authorize.get_payload()
 
-    await jwt.check_banned(token_data)
+    if await jwt.check_banned(payload):
+        await authorize.raise_banned_jwt(payload.type)
 
-    return token_data.user_id
+    return payload

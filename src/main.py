@@ -6,6 +6,7 @@ from async_fastapi_jwt_auth.exceptions import AuthJWTException
 from fastapi import Depends
 from fastapi import FastAPI
 from fastapi import Request
+from fastapi import Response
 from fastapi import status
 from fastapi.responses import JSONResponse
 from fastapi.responses import ORJSONResponse
@@ -22,6 +23,8 @@ from src.jwt_auth_helpers import CustomAuthJWT
 from src.jwt_auth_helpers import check_permissions
 from src.middleware.middleware import setup_middleware
 from src.models.errors import ErrorBody
+from src.services.custom_error import JWTBannedError
+from src.services.custom_error import MisdirectedRequestError
 from src.services.custom_error import ResponseError
 
 
@@ -66,14 +69,24 @@ app = FastAPI(
 setup_middleware(app)
 
 
-@app.exception_handler(ResponseError)
-async def misdirected_error_handler(request: Request, exc: ResponseError) -> JSONResponse:  # noqa: RUF029
+@app.exception_handler(MisdirectedRequestError)
+async def misdirected_error_handler(_: Request, exc: MisdirectedRequestError) -> JSONResponse:  # noqa: RUF029
     return JSONResponse(status_code=status.HTTP_421_MISDIRECTED_REQUEST, content=exc.body.model_dump())
 
 
 @app.exception_handler(AuthJWTException)
-async def authjwt_exception_handler(request: Request, exc: AuthJWTException) -> JSONResponse:  # noqa: RUF029
+async def authjwt_exception_handler(_: Request, exc: AuthJWTException) -> JSONResponse:  # noqa: RUF029
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
+
+
+@app.exception_handler(ResponseError)
+async def response_exception_handler(_: Request, exc: ResponseError) -> JSONResponse:  # noqa: RUF029
+    return JSONResponse(status_code=exc.status_code, content=exc.body.model_dump())
+
+
+@app.exception_handler(JWTBannedError)
+async def jwt_banned_exception_handler(_: Request, exc: JWTBannedError) -> Response:  # noqa: RUF029
+    return exc.response
 
 
 app.include_router(auth.router, prefix="/auth")

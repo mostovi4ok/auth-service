@@ -20,7 +20,7 @@ class UserService:
         self.session = session
         self.password = password
 
-    async def get_user(self, login: str, is_deleted: bool = False) -> UserOrm | None:
+    async def get_user(self, login: str, *, is_deleted: bool = False) -> UserOrm | None:
         stmt = (
             select(UserOrm)
             .options(selectinload(UserOrm.permissions))
@@ -45,7 +45,7 @@ class UserService:
                     ...
 
     async def create_user(self, account: AccountModel) -> UserOrm:
-        deleted_user = await self.get_user(account.login, True)
+        deleted_user = await self.get_user(account.login, is_deleted=True)
         if deleted_user is None:
             user = UserOrm(
                 login=account.login,

@@ -3,7 +3,6 @@ from typing import Annotated
 from fastapi import APIRouter
 from fastapi import Body
 from fastapi import Depends
-from fastapi import status
 
 from src.api.models.access_control import ChangePermissionModel
 from src.api.models.access_control import CreatePermissionModel
@@ -25,7 +24,6 @@ permissions_tags_metadata = {"name": "Права", "description": "Управл�
     summary="Создание права",
     description="Создание права",
     response_description="Право создано",
-    responses={status.HTTP_200_OK: {"model": PermissionModel}},
     tags=["Права"],
 )
 async def create(
@@ -56,7 +54,6 @@ async def delete(
     summary="Изменение права",
     description="Изменение права",
     response_description="Право изменено",
-    responses={status.HTTP_200_OK: {"model": PermissionModel}},
     tags=["Права"],
 )
 async def update(
@@ -76,7 +73,6 @@ async def update(
     summary="Просмотр всех прав",
     description="Просмотр всех прав",
     response_description="Список прав",
-    responses={status.HTTP_200_OK: {"model": PermissionsModel}},
     tags=["Права"],
 )
 async def get_all(
@@ -90,7 +86,6 @@ async def get_all(
     summary="Назначить пользователю право",
     description="Назначить пользователю право. Допускается ввод минимум одного поля для права и пользователя",
     response_description="Пользователь и его права",
-    responses={status.HTTP_200_OK: {"model": ResponseUserModel}},
     tags=["Права"],
 )
 async def assign(
@@ -108,7 +103,6 @@ async def assign(
     summary="Отобрать у пользователя право",
     description="Отобрать у пользователя право",
     response_description="Пользователь и его права",
-    responses={status.HTTP_200_OK: {"model": ResponseUserModel}},
     tags=["Права"],
 )
 async def take_away(
@@ -126,7 +120,6 @@ async def take_away(
     summary="Получить права пользователя",
     description="Минимум один параметр должен быть заполнен.",
     response_description="Права пользователя",
-    responses={status.HTTP_200_OK: {"model": PermissionsModel}},
     tags=["Права"],
 )
 async def get_user_permissions(
