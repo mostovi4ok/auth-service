@@ -1,4 +1,4 @@
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim@sha256:b6007a73910218ab068c7a9a7fb91e68f97017ab486af0ecd00403561a64e573
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Novosibirsk

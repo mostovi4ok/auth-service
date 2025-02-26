@@ -3,7 +3,7 @@ name = "auth-service"
 version = "0.1.0"
 description = "Service auth"
 readme = "README.md"
-requires-python = "==3.12.8"
+requires-python = "==3.12.9"
 dependencies = [
     "aiohttp~=3.11.12",
     "alembic~=1.14.0",
